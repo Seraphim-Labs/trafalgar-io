@@ -1,3 +1,2 @@
-// Auto-detects backend — no changes needed.
-// When served from Render, frontend and backend share the same URL.
-window.TRAFALGAR_SERVER = window.location.origin;
+// Backend is hosted on fly.io — no changes needed.
+window.TRAFALGAR_SERVER = 'https://trafalgar-io.fly.dev';
