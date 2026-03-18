@@ -163,32 +163,35 @@ function spawnWake(ship) {
     const speed = Math.abs(ship.vel || 0);
     if (speed < 0.05) return;
 
-    // Stern direction: negative of ship forward
-    const fwdX = Math.cos(ship.ry - Math.PI / 2);
-    const fwdZ = Math.sin(ship.ry - Math.PI / 2);
-    const sternX = ship.x - fwdX * 6;
-    const sternZ = ship.z - fwdZ * 6;
-    // Right vector for the V spread
-    const rtX = Math.cos(ship.ry), rtZ = Math.sin(ship.ry);
+    // Visual bow direction — Three.js: local +X rotated by ry around Y = (cos(ry), 0, -sin(ry))
+    const bowX =  Math.cos(ship.ry);
+    const bowZ = -Math.sin(ship.ry);
+    // Visual starboard = bow × up: (sin(ry), 0, cos(ry))
+    const rtX =  Math.sin(ship.ry);
+    const rtZ =  Math.cos(ship.ry);
+
+    // Stern sits behind the bow
+    const sternX = ship.x - bowX * 7;
+    const sternZ = ship.z - bowZ * 7;
 
     for (let side = -1; side <= 1; side += 2) {
         if (wakeParticles.length >= MAX_WAKES) break;
         const p = new THREE.Mesh(wakeGeo, wakeMat.clone());
         p.rotation.x = -Math.PI / 2;
         p.position.set(
-            sternX + rtX * side * 2.5 + (Math.random()-0.5),
+            sternX + rtX * side * 2.5 + (Math.random() - 0.5) * 0.5,
             0.05,
-            sternZ + rtZ * side * 2.5 + (Math.random()-0.5)
+            sternZ + rtZ * side * 2.5 + (Math.random() - 0.5) * 0.5
         );
-        const spread = speed * 0.8;
         p.userData = {
             life: 1.0,
-            decay: 0.012 + Math.random() * 0.008,
-            vx: -fwdX * spread * 0.3 + rtX * side * spread * 0.15,
-            vz: -fwdZ * spread * 0.3 + rtZ * side * spread * 0.15,
-            maxScale: 3 + speed * 4,
+            decay: 0.014 + Math.random() * 0.008,
+            // Spread outward sideways + slightly backward
+            vx: rtX * side * speed * 0.4 - bowX * speed * 0.15,
+            vz: rtZ * side * speed * 0.4 - bowZ * speed * 0.15,
+            maxScale: 1.5 + speed * 2,
         };
-        p.scale.setScalar(0.5 + speed * 1.5);
+        p.scale.setScalar(0.4 + speed * 0.6);
         scene.add(p);
         wakeParticles.push(p);
     }
@@ -202,9 +205,8 @@ function updateWakes(dt) {
         p.position.x += ud.vx * dt;
         p.position.z += ud.vz * dt;
         // Expand and fade
-        const age = 1 - ud.life;
-        p.scale.setScalar(p.scale.x + ud.maxScale * 0.015 * dt);
-        p.material.opacity = Math.max(0, ud.life * 0.35);
+        p.scale.setScalar(p.scale.x + ud.maxScale * 0.008 * dt);
+        p.material.opacity = Math.max(0, ud.life * 0.22);
         if (ud.life <= 0) { scene.remove(p); wakeParticles.splice(i, 1); }
     }
 }
@@ -267,18 +269,19 @@ function updateRangeArcs() {
     if (!showRangeDisplay) return;
     rangeGroup.position.set(me.x, 0, me.z);
     rangeGroup.rotation.y = me.ry;
-    const invQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), me.ry).invert();
     let portHit = false, stbdHit = false, bowHit = false;
     (gameState.ships || []).forEach(s => {
         if (s.team === me.team || s.isSinking || s.isDead) return;
         const dx = s.x - me.x, dz = s.z - me.z;
         const dist = Math.sqrt(dx*dx + dz*dz);
         if (dist > MAX_CANNON_RANGE_ARC) return;
-        const local = new THREE.Vector3(dx, 0, dz).applyQuaternion(invQ);
-        if (local.z < -2) portHit = true;
-        if (local.z >  2) stbdHit = true;
-        const fa = local.x > 0 ? Math.atan2(Math.abs(local.z), local.x) : Math.PI;
-        if (local.x > 0 && fa < Math.PI/6) bowHit = true;
+        // Visual local frame
+        const lFwd   =  dx * Math.cos(me.ry) - dz * Math.sin(me.ry);
+        const lRight =  dx * Math.sin(me.ry) + dz * Math.cos(me.ry);
+        if (lRight < -2) portHit = true;
+        if (lRight >  2) stbdHit = true;
+        const fa = lFwd > 0 ? Math.atan2(Math.abs(lRight), lFwd) : Math.PI;
+        if (lFwd > 0 && fa < Math.PI/6) bowHit = true;
     });
     portArcLine.material.color.setHex(portHit ? 0xff3300 : 0xff8800);
     portArcLine.material.opacity = portHit ? 0.45 : 0.08;
@@ -529,19 +532,22 @@ function updateAimAssist(state) {
     if (!me || me.isSinking || me.isDead) { aimDivs.forEach(a => a.div.style.display = 'none'); return; }
 
     const enemies = state.ships.filter(s => s.team !== me.team && !s.isSinking && !s.isDead);
-    const cosR = Math.cos(-me.ry), sinR = Math.sin(-me.ry);
     let di = 0;
 
     for (const en of enemies) {
         if (di >= aimDivs.length) break;
         const dx = en.x - me.x, dz = en.z - me.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
-        const lx =  dx * cosR - dz * sinR;
-        const lz =  dx * sinR + dz * cosR;
 
-        const portW = dist <= MAX_CANNON_RANGE && lz < -2 && Math.abs(lx) < 20;
-        const stbdW = dist <= MAX_CANNON_RANGE && lz >  2 && Math.abs(lx) < 20;
-        const bowA  = dist <= MAX_CANNON_RANGE && lx > 0 && Math.atan2(Math.abs(lz), lx) < Math.PI / 8 && Math.abs(lz) < lx;
+        // Visual local frame: bow = (cos(ry), -sin(ry)) in XZ
+        // Inverse rotation by ry: local_fwd = dx*cos(ry) - dz*sin(ry)
+        //                         local_right = dx*sin(ry) + dz*cos(ry)
+        const lFwd   =  dx * Math.cos(me.ry) - dz * Math.sin(me.ry);
+        const lRight =  dx * Math.sin(me.ry) + dz * Math.cos(me.ry);
+
+        const portW = dist <= MAX_CANNON_RANGE && lRight < -2 && Math.abs(lFwd) < 20;
+        const stbdW = dist <= MAX_CANNON_RANGE && lRight >  2 && Math.abs(lFwd) < 20;
+        const bowA  = dist <= MAX_CANNON_RANGE && lFwd > 0 && Math.atan2(Math.abs(lRight), lFwd) < Math.PI / 8 && Math.abs(lRight) < lFwd;
 
         const wp = new THREE.Vector3(en.x, 8, en.z).project(camera);
         if (wp.z > 1) continue;
