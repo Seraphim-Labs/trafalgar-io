@@ -4,7 +4,7 @@ module.exports = {
     TICK_MS:        50,
     MAX_PLAYERS:    8,
     MIN_COMBATANTS: 4,
-    MAP_SIZE:       2000,
+    MAP_SIZE:       1100,
     GRAVITY:        0.014 * 2.5,
     BALL_SPEED:     7.5 * 2.5,
     BALL_Y0:        0.18 * 2.5,

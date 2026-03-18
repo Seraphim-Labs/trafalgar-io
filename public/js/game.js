@@ -12,11 +12,11 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(500, 1000, 500);
 scene.add(sun);
-scene.fog = new THREE.FogExp2(0x8899aa, 0.00008);
+scene.fog = new THREE.FogExp2(0x8899aa, 0.00018);
 
 // Ocean
 const ocean = new THREE.Mesh(
-    new THREE.PlaneGeometry(4000, 4000),
+    new THREE.PlaneGeometry(2400, 2400, 32, 32),
     new THREE.MeshStandardMaterial({ color: 0x1a4060, roughness: 0.8 })
 );
 ocean.rotation.x = -Math.PI / 2;
@@ -147,6 +147,65 @@ function updateParticles(dt) {
         p.material.opacity = p.userData.life * 0.7;
         p.scale.setScalar(Math.max(0.01, p.userData.life));
         if (p.userData.life <= 0) { scene.remove(p); waterSplashes.splice(i, 1); }
+    }
+}
+
+// ── Ship wakes ─────────────────────────────────────────────────────
+const wakeParticles = [];
+const MAX_WAKES = 300;
+const wakeMat = new THREE.MeshBasicMaterial({
+    color: 0xaaccdd, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+});
+const wakeGeo = new THREE.PlaneGeometry(1, 1);
+
+function spawnWake(ship) {
+    if (wakeParticles.length >= MAX_WAKES) return;
+    const speed = Math.abs(ship.vel || 0);
+    if (speed < 0.05) return;
+
+    // Stern direction: negative of ship forward
+    const fwdX = Math.cos(ship.ry - Math.PI / 2);
+    const fwdZ = Math.sin(ship.ry - Math.PI / 2);
+    const sternX = ship.x - fwdX * 6;
+    const sternZ = ship.z - fwdZ * 6;
+    // Right vector for the V spread
+    const rtX = Math.cos(ship.ry), rtZ = Math.sin(ship.ry);
+
+    for (let side = -1; side <= 1; side += 2) {
+        if (wakeParticles.length >= MAX_WAKES) break;
+        const p = new THREE.Mesh(wakeGeo, wakeMat.clone());
+        p.rotation.x = -Math.PI / 2;
+        p.position.set(
+            sternX + rtX * side * 2.5 + (Math.random()-0.5),
+            0.05,
+            sternZ + rtZ * side * 2.5 + (Math.random()-0.5)
+        );
+        const spread = speed * 0.8;
+        p.userData = {
+            life: 1.0,
+            decay: 0.012 + Math.random() * 0.008,
+            vx: -fwdX * spread * 0.3 + rtX * side * spread * 0.15,
+            vz: -fwdZ * spread * 0.3 + rtZ * side * spread * 0.15,
+            maxScale: 3 + speed * 4,
+        };
+        p.scale.setScalar(0.5 + speed * 1.5);
+        scene.add(p);
+        wakeParticles.push(p);
+    }
+}
+
+function updateWakes(dt) {
+    for (let i = wakeParticles.length - 1; i >= 0; i--) {
+        const p = wakeParticles[i];
+        const ud = p.userData;
+        ud.life -= ud.decay * dt;
+        p.position.x += ud.vx * dt;
+        p.position.z += ud.vz * dt;
+        // Expand and fade
+        const age = 1 - ud.life;
+        p.scale.setScalar(p.scale.x + ud.maxScale * 0.015 * dt);
+        p.material.opacity = Math.max(0, ud.life * 0.35);
+        if (ud.life <= 0) { scene.remove(p); wakeParticles.splice(i, 1); }
     }
 }
 
@@ -349,6 +408,11 @@ function applyState(state) {
         }
         if (ev.type === 'capture') addBattleLog(ev.player + ' captured the flag!');
         if (ev.type === 'flagReturn') addBattleLog(ev.team + ' flag returned!');
+    }
+
+    // Wakes behind every moving ship
+    for (const sd of state.ships) {
+        if (!sd.isDead && !sd.isSinking) spawnWake(sd);
     }
 
     // Damage smoke for ships below 60% HP
@@ -582,6 +646,7 @@ function animate() {
     lastAnimTime = now;
 
     updateParticles(dt);
+    updateWakes(dt);
     updateCannonCircles();
     updateRangeArcs();
     fireLights.forEach(fl => { if (fl.intensity > 0) fl.intensity *= 0.88; });
