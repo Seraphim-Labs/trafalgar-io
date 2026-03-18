@@ -3,23 +3,26 @@
 Multiplayer naval battle IO game. 3 game modes, 3 ship types, chat, clans, AI bots.
 
 **Frontend (Netlify):** https://chic-mousse-f1bb43.netlify.app
-**Backend (Render):** deploy from GitHub below — no credit card needed
+**Backend:** deploy below — no credit card needed
 
 ---
 
-## Deploy the Backend (only step needed — no credit card)
+## ▶ Deploy the backend (one click, no credit card)
 
-1. Go to **render.com** → sign up free (no credit card)
-2. New → **Web Service** → connect GitHub → select **trafalgar-io**
-3. Settings auto-fill from `render.yaml` → click **Deploy**
-4. Done — your game URL is `https://trafalgar-io.onrender.com`
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Seraphim-Labs/trafalgar-io)
 
-**No cold starts:** The server pings itself every 10 minutes automatically.
-It will never sleep, even on the free tier.
+1. Click the button above
+2. Sign up to Render (free, no credit card)
+3. Click **Apply** — done
+
+The server names itself `trafalgar-io` and runs at `https://trafalgar-io.onrender.com`.
+**It never sleeps** — a built-in self-ping fires every 10 minutes to keep it awake.
+
+The Netlify frontend already points to that URL. The moment Render finishes deploying, the game is live.
 
 ---
 
-## Local Dev
+## Local dev
 
 ```bash
 npm install
@@ -42,8 +45,3 @@ node server.js
 | Enter | Chat |
 | Q / E | Orbit camera |
 | Z / X | Zoom |
-
-## Getting Players
-- Share on Discord browser-game servers
-- Post on r/WebGames
-- Add to itch.io as a free HTML game
