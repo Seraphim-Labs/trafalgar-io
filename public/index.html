@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trafalgar.io</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="lobby">
+  <div class="lobby-title">
+    <div class="title-voxel">TRAFALGAR.IO</div>
+    <div class="title-sub">Multiplayer Naval Combat &middot; Age of Sail</div>
+  </div>
+
+  <div class="lobby-row">
+    <div class="lobby-card">
+      <div class="card-title">CAPTAIN</div>
+      <label>Name</label>
+      <input id="captainName" type="text" maxlength="24" placeholder="Your name">
+      <label>Title</label>
+      <select id="captainTitle">
+        <option>Captain</option><option>Admiral</option><option>Commodore</option>
+        <option>Commander</option><option>Rear-Admiral</option><option>Vice-Admiral</option>
+        <option>Ensign</option><option>Boatswain</option>
+      </select>
+      <label>Clan Tag <span style="color:#555;font-size:0.8em">(2-4 letters)</span></label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="clanTagInput" type="text" maxlength="4" placeholder="TAG" style="width:80px;text-transform:uppercase;">
+        <button class="btn-small" onclick="Clans.apply()">Apply</button>
+        <button class="btn-small" onclick="Clans.leave()" style="color:#ff5555;">Leave</button>
+      </div>
+      <div id="clanStatus" style="color:#555;font-size:0.72em;margin-top:4px;"></div>
+    </div>
+
+    <div class="lobby-card">
+      <div class="card-title">YOUR SHIP</div>
+      <div id="shipTypeGrid" class="ship-grid">
+        <div class="ship-option selected" data-type="frigate">
+          <div class="ship-opt-name">Frigate</div>
+          <div class="ship-opt-desc">Balanced broadside warship</div>
+          <div class="ship-opt-stats">HP ████░ &nbsp; SPD ███░░ &nbsp; GUNS ████░</div>
+        </div>
+        <div class="ship-option" data-type="sloop">
+          <div class="ship-opt-name">Sloop</div>
+          <div class="ship-opt-desc">Fast raider &middot; best for CTF</div>
+          <div class="ship-opt-stats">HP ██░░░ &nbsp; SPD █████ &nbsp; GUNS ██░░░</div>
+        </div>
+        <div class="ship-option" data-type="sotl">
+          <div class="ship-opt-name">Ship of the Line</div>
+          <div class="ship-opt-desc">Slow, devastating broadsides</div>
+          <div class="ship-opt-stats">HP █████ &nbsp; SPD █░░░░ &nbsp; GUNS █████</div>
+        </div>
+      </div>
+      <div class="colour-row">
+        <div><label>Sails</label><div id="sailColours" class="colour-swatches"></div></div>
+        <div><label>Hull</label><div id="hullColours" class="colour-swatches"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lobby-card full-width">
+    <div class="card-title">MATCH</div>
+    <div class="match-row">
+      <div>
+        <label>Game Mode</label>
+        <div class="mode-grid">
+          <div class="mode-option selected" data-mode="dm">
+            <div class="mode-name">&#x2694; Deathmatch</div>
+            <div class="mode-desc">Most kills when time runs out</div>
+          </div>
+          <div class="mode-option" data-mode="ctf">
+            <div class="mode-name">&#x1F6A9; Capture the Flag</div>
+            <div class="mode-desc">Steal enemy flag, return to your base</div>
+          </div>
+          <div class="mode-option" data-mode="capital">
+            <div class="mode-name">&#x1F480; Sink the Capital Ship</div>
+            <div class="mode-desc">Destroy the enemy flagship to win</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label>Duration</label>
+        <div class="duration-grid">
+          <div class="dur-option" data-dur="3m">3 min</div>
+          <div class="dur-option selected" data-dur="5m">5 min</div>
+          <div class="dur-option" data-dur="10m">10 min</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lobby-card full-width">
+    <div class="card-title">OPEN MATCHES <button class="btn-small" onclick="refreshRooms()" style="pointer-events:auto;">&#x21BB; Refresh</button></div>
+    <div id="roomList" class="room-list"><div style="color:#445;font-size:0.8em;">Loading...</div></div>
+  </div>
+
+  <button id="battleBtn" class="battle-btn" onclick="joinGame()">&#9875; SET SAIL</button>
+  <div id="lobbyError" style="color:#ff5555;text-align:center;font-size:0.8em;margin-top:8px;"></div>
+</div>
+<script src="js/config.js"></script>
+<script src="js/clans.js"></script>
+<script src="js/lobby.js"></script>
+</body>
+</html>

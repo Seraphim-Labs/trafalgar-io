@@ -1,0 +1,6 @@
+node_modules/
+*.local
+.env
+check_refs.js
+check_winpath.js
+guard1.js
