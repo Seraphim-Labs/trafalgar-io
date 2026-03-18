@@ -31,7 +31,128 @@ for (let i = 0; i < 6; i++) {
 }
 let nextFl = 0;
 
-const voxelGeo = new THREE.BoxGeometry(1, 1, 1);
+const voxelGeo  = new THREE.BoxGeometry(1, 1, 1);
+const flashGeo  = new THREE.SphereGeometry(1, 8, 8);
+const smokeGeo  = new THREE.SphereGeometry(2, 6, 6);
+const splashGeo = new THREE.SphereGeometry(0.5, 6, 6);
+const wind = new THREE.Vector3(0.04, 0, 0.015);
+
+const fxParticles   = [];
+const smokeParticles = [];
+const waterSplashes  = [];
+const MAX_FX = 400, MAX_SMOKE = 500, MAX_SPLASH = 120;
+
+function spawnMuzzleFlash(pos, dir) {
+    if (fxParticles.length >= MAX_FX) return;
+    const core = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
+    core.position.copy(pos).addScaledVector(dir, 1);
+    core.scale.setScalar(3.5);
+    core.userData = { life: 1.0, decay: 0.15, vel: dir.clone().multiplyScalar(0.1), type: 'flash' };
+    scene.add(core); fxParticles.push(core);
+    for (let i = 0; i < 4; i++) {
+        if (fxParticles.length >= MAX_FX) break;
+        const fb = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({
+            color: new THREE.Color().setHSL(0.06 + Math.random()*0.04, 1.0, 0.5 + Math.random()*0.2), transparent: true
+        }));
+        fb.position.copy(pos).addScaledVector(dir, 0.5 + Math.random());
+        fb.position.add(new THREE.Vector3((Math.random()-0.5)*1.5, (Math.random()-0.5)*1.5, (Math.random()-0.5)*1.5));
+        fb.userData = { life: 1.0, decay: 0.06 + Math.random()*0.03,
+            vel: dir.clone().multiplyScalar(0.3 + Math.random()*0.2).add(new THREE.Vector3((Math.random()-0.5)*0.15, 0.05+Math.random()*0.1, (Math.random()-0.5)*0.15)),
+            type: 'fireball' };
+        fb.scale.setScalar(1.0 + Math.random()*0.5);
+        scene.add(fb); fxParticles.push(fb);
+    }
+}
+
+function spawnCannonSmoke(pos, dir) {
+    for (let i = 0; i < 6; i++) {
+        if (smokeParticles.length >= MAX_SMOKE) return;
+        const p = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({
+            color: new THREE.Color().setHSL(0, 0, 0.55 + Math.random()*0.35), transparent: true, opacity: 0.0, depthWrite: false
+        }));
+        const offset = dir.clone().multiplyScalar(1.0 + Math.random()*2).add(new THREE.Vector3((Math.random()-0.5)*2, Math.random()*0.5, (Math.random()-0.5)*2));
+        p.position.copy(pos).add(offset);
+        p.userData = { life: 1.0, decay: 0.003 + Math.random()*0.002,
+            vel: dir.clone().multiplyScalar(0.3 + Math.random()*0.4).add(new THREE.Vector3((Math.random()-0.5)*0.15, 0.02+Math.random()*0.04, (Math.random()-0.5)*0.15)),
+            startScale: 0.3 + Math.random()*0.3, maxScale: 3.0 + Math.random()*2.0, fadeIn: 0.9, drag: 0.985 };
+        p.scale.setScalar(p.userData.startScale);
+        scene.add(p); smokeParticles.push(p);
+    }
+}
+
+function spawnImpactExplosion(pos) {
+    const flash = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true }));
+    flash.position.copy(pos); flash.scale.setScalar(4);
+    flash.userData = { life: 1.0, decay: 0.12, vel: new THREE.Vector3(0, 0.05, 0), type: 'flash' };
+    scene.add(flash); fxParticles.push(flash);
+    for (let i = 0; i < 10; i++) {
+        if (fxParticles.length >= MAX_FX) break;
+        const isFire = i < 5;
+        const color = isFire
+            ? new THREE.Color().setHSL(0.04 + Math.random()*0.06, 0.9, 0.4 + Math.random()*0.3)
+            : new THREE.Color().setHSL(0.08, 0.5, 0.15 + Math.random()*0.15);
+        const p = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color, transparent: true }));
+        p.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*3, Math.random()*2, (Math.random()-0.5)*3));
+        p.userData = { life: 1.0, decay: isFire ? 0.025 + Math.random()*0.02 : 0.03 + Math.random()*0.03,
+            vel: new THREE.Vector3((Math.random()-0.5)*0.6, 0.15+Math.random()*0.3, (Math.random()-0.5)*0.6),
+            type: isFire ? 'fireball' : 'debris', gravity: !isFire };
+        p.scale.setScalar(isFire ? 1.0 + Math.random() : 0.3 + Math.random()*0.3);
+        scene.add(p); fxParticles.push(p);
+    }
+}
+
+function spawnDamageSmokeAt(shipPos, hpRatio) {
+    if (smokeParticles.length >= MAX_SMOKE) return;
+    const p = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({
+        color: new THREE.Color().setHSL(0, 0, 0.15 + Math.random()*0.2), transparent: true, opacity: 0.0, depthWrite: false
+    }));
+    p.position.set(shipPos.x + (Math.random()-0.5)*8, shipPos.y + 2 + Math.random()*5, shipPos.z + (Math.random()-0.5)*8);
+    p.userData = { life: 1.0, decay: 0.003 + Math.random()*0.003,
+        vel: new THREE.Vector3((Math.random()-0.5)*0.03, 0.08+Math.random()*0.06, (Math.random()-0.5)*0.03),
+        startScale: 0.5 + Math.random()*0.5, maxScale: 3.0 + Math.random()*2.0 + (1-hpRatio)*2,
+        fadeIn: 0.85, drag: 0.995 };
+    p.scale.setScalar(p.userData.startScale);
+    scene.add(p); smokeParticles.push(p);
+}
+
+function updateParticles(dt) {
+    for (let i = fxParticles.length - 1; i >= 0; i--) {
+        const p = fxParticles[i]; const ud = p.userData;
+        ud.life -= ud.decay * dt;
+        if (ud.vel) { p.position.addScaledVector(ud.vel, dt); if (ud.gravity) ud.vel.y -= 0.02*dt; }
+        p.position.addScaledVector(wind, dt*0.3);
+        if (ud.type === 'flash')   { p.scale.setScalar(Math.max(0.01, ud.life*ud.life*4)); p.material.opacity = ud.life; }
+        else if (ud.type === 'fireball') { const age=1-ud.life; p.scale.setScalar(Math.max(0.01,(1+age*2)*1.2)); p.material.opacity=ud.life*0.85; p.material.color.setHSL(Math.max(0,0.07-age*0.04),0.9,Math.max(0.1,0.5-age*0.3)); }
+        else { p.scale.setScalar(Math.max(0.01,0.3+ud.life*0.2)); p.material.opacity=ud.life; }
+        if (ud.life <= 0) { scene.remove(p); fxParticles.splice(i, 1); }
+    }
+    for (let i = smokeParticles.length - 1; i >= 0; i--) {
+        const p = smokeParticles[i]; const ud = p.userData;
+        ud.life -= ud.decay * dt;
+        if (ud.vel) { p.position.addScaledVector(ud.vel, dt); if (ud.drag) ud.vel.multiplyScalar(Math.pow(ud.drag, dt)); }
+        p.position.addScaledVector(wind, dt);
+        const age = 1 - ud.life;
+        const sc = ud.startScale + (ud.maxScale - ud.startScale) * Math.min(1, age * 2);
+        p.scale.setScalar(Math.max(0.01, sc));
+        if (age < (1 - ud.fadeIn)) p.material.opacity = age / (1 - ud.fadeIn) * 0.6;
+        else p.material.opacity = ud.life * 0.6;
+        if (ud.life <= 0) { scene.remove(p); smokeParticles.splice(i, 1); }
+    }
+    for (let i = waterSplashes.length - 1; i >= 0; i--) {
+        const p = waterSplashes[i];
+        p.userData.life -= p.userData.decay * dt;
+        p.userData.vel.y -= 0.04 * dt;
+        p.position.addScaledVector(p.userData.vel, dt);
+        if (p.position.y < 0) p.position.y = 0;
+        p.material.opacity = p.userData.life * 0.7;
+        p.scale.setScalar(Math.max(0.01, p.userData.life));
+        if (p.userData.life <= 0) { scene.remove(p); waterSplashes.splice(i, 1); }
+    }
+}
+
+// ── Client-side reload tracking ────────────────────────────────────
+const clientReloadTimes = new Array(14).fill(0);
+const RELOAD_MS = 2500;
 
 // ── State ──────────────────────────────────────────────────────────
 const params     = new URLSearchParams(location.search);
@@ -128,17 +249,34 @@ function applyState(state) {
     }
 
     for (const ev of (state.events || [])) {
-        if (ev.type === 'hit' && ev.shipId === myShipId) {
-            screenShake = 6;
-            const hf = document.getElementById('hit-flash');
-            if (hf) { hf.style.opacity = '1'; setTimeout(() => hf.style.opacity = '0', 80); }
+        if (ev.type === 'hit') {
+            // Find where the hit ship is and spawn explosion there
+            const hitShip = state.ships.find(s => s.id === ev.shipId);
+            if (hitShip) spawnImpactExplosion(new THREE.Vector3(hitShip.x, 3, hitShip.z));
+            if (ev.shipId === myShipId) {
+                screenShake = 6;
+                const hf = document.getElementById('hit-flash');
+                if (hf) { hf.style.opacity = '1'; setTimeout(() => hf.style.opacity = '0', 80); }
+            }
         }
         if (ev.type === 'fire') {
             const sh = state.ships.find(s => s.id === ev.shipId);
             if (sh) {
+                // Muzzle flash + smoke at ship position in fire direction
+                const cannonIdx = ev.cannonIdx || 0;
+                const half = Math.floor(7 / 2);
+                let lx = 1, lz = 0;
+                if (cannonIdx >= 1 && cannonIdx <= half) { lx = 0; lz = -1; }
+                else if (cannonIdx > half) { lx = 0; lz = 1; }
+                const cos = Math.cos(sh.ry), sin = Math.sin(sh.ry);
+                const dir = new THREE.Vector3(lx*cos - lz*sin, 0, lx*sin + lz*cos).normalize();
+                const pos = new THREE.Vector3(sh.x, 3, sh.z);
+                spawnMuzzleFlash(pos, dir);
+                spawnCannonSmoke(pos, dir);
+
                 const fl = fireLights[nextFl++ % fireLights.length];
                 fl.position.set(sh.x, 4, sh.z);
-                fl.intensity = 120;
+                fl.intensity = 150;
             }
         }
         if (ev.type === 'sank') {
@@ -147,6 +285,15 @@ function applyState(state) {
         }
         if (ev.type === 'capture') addBattleLog(ev.player + ' captured the flag!');
         if (ev.type === 'flagReturn') addBattleLog(ev.team + ' flag returned!');
+    }
+
+    // Damage smoke for ships below 60% HP
+    for (const sd of state.ships) {
+        if (sd.isDead || sd.isSinking) continue;
+        const hpRatio = sd.hp / sd.maxHp;
+        if (hpRatio < 0.6 && Math.random() < (1 - hpRatio) * 0.08) {
+            spawnDamageSmokeAt(new THREE.Vector3(sd.x, 0, sd.z), hpRatio);
+        }
     }
 
     fireLights.forEach(fl => { if (fl.intensity > 0) fl.intensity *= 0.85; });
@@ -209,10 +356,25 @@ function initCannons() {
         el.id = 'cannon-circle-' + i;
         c.appendChild(el);
     }
-    // Show all green (server manages reload, client can't know without reloadTimes)
+    clientReloadTimes.fill(0);
+}
+
+function updateCannonCircles() {
+    const now = Date.now();
     for (let i = 0; i < 7; i++) {
         const el = document.getElementById('cannon-circle-' + i);
-        if (el) el.style.background = '#52ff52';
+        if (!el) continue;
+        const elapsed = now - (clientReloadTimes[i] || 0);
+        if (elapsed >= RELOAD_MS) {
+            el.style.background = '#52ff52';
+            el.style.borderColor = '#2a8a2a';
+            el.style.boxShadow   = '0 0 4px rgba(82,255,82,0.4)';
+        } else {
+            const deg = Math.round((elapsed / RELOAD_MS) * 360);
+            el.style.background  = `conic-gradient(#ffaa00 ${deg}deg, #222 ${deg}deg)`;
+            el.style.borderColor = '#334';
+            el.style.boxShadow   = 'none';
+        }
     }
 }
 
@@ -284,10 +446,19 @@ window.addEventListener('keydown', e => {
     if (e.key.toLowerCase() === 'e') orbitY -= 0.05;
     if (e.key.toLowerCase() === 'z') camDist = Math.max(40, camDist - 15);
     if (e.key.toLowerCase() === 'x') camDist = Math.min(700, camDist + 15);
-    if (e.key.toLowerCase() === 'r') socket.emit('broadside', { side: 'port' });
-    if (e.key.toLowerCase() === 't') socket.emit('broadside', { side: 'starboard' });
+    if (e.key.toLowerCase() === 'r') {
+        socket.emit('broadside', { side: 'port' });
+        for (let i = 1; i <= 3; i++) clientReloadTimes[i] = Date.now() + i * 120;
+    }
+    if (e.key.toLowerCase() === 't') {
+        socket.emit('broadside', { side: 'starboard' });
+        for (let i = 4; i <= 6; i++) clientReloadTimes[i] = Date.now() + (i-4) * 120;
+    }
     const n = parseInt(e.key);
-    if (n >= 1 && n <= 7) socket.emit('fire', { cannonIdx: n - 1 });
+    if (n >= 1 && n <= 7) {
+        socket.emit('fire', { cannonIdx: n - 1 });
+        clientReloadTimes[n - 1] = Date.now();
+    }
     if (e.key === 'Tab') {
         e.preventDefault();
         showScoreboard = !showScoreboard;
@@ -336,8 +507,17 @@ window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
 });
 
+let lastAnimTime = performance.now();
 function animate() {
     requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt  = Math.min((now - lastAnimTime) / 16.67, 3);
+    lastAnimTime = now;
+
+    updateParticles(dt);
+    updateCannonCircles();
+    fireLights.forEach(fl => { if (fl.intensity > 0) fl.intensity *= 0.88; });
+
     if (!gameState) { renderer.render(scene, camera); return; }
 
     const me = gameState.ships.find(s => s.id === myShipId);
