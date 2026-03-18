@@ -164,7 +164,70 @@ let orbitY       = Math.PI;
 let camDist      = 200;
 let screenShake  = 0;
 const keys       = {};
-let showScoreboard = false;
+let showScoreboard  = false;
+let showRangeDisplay = false;
+
+// ── 3D Range Arcs (port / starboard / bow) ─────────────────────────
+let rangeGroup = null, portArcLine = null, stbdArcLine = null, bowArcLine = null;
+let aimDivRangeEnabled = false;
+const MAX_CANNON_RANGE_ARC = 250;
+
+function createArcPts(startAngle, endAngle, radius, segs) {
+    const pts = [];
+    pts.push(new THREE.Vector3(0, 0.8, 0));
+    pts.push(new THREE.Vector3(Math.cos(startAngle)*radius, 0.8, Math.sin(startAngle)*radius));
+    for (let i = 0; i <= segs; i++) {
+        const a = startAngle + (endAngle - startAngle) * i / segs;
+        pts.push(new THREE.Vector3(Math.cos(a)*radius, 0.8, Math.sin(a)*radius));
+    }
+    pts.push(new THREE.Vector3(0, 0.8, 0));
+    return pts;
+}
+
+function initRangeArcs() {
+    if (rangeGroup) { scene.remove(rangeGroup); }
+    rangeGroup = new THREE.Group();
+    const portGeo = new THREE.BufferGeometry().setFromPoints(createArcPts(Math.PI, 2*Math.PI, MAX_CANNON_RANGE_ARC, 40));
+    portArcLine = new THREE.Line(portGeo, new THREE.LineBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.08 }));
+    rangeGroup.add(portArcLine);
+    const stbdGeo = new THREE.BufferGeometry().setFromPoints(createArcPts(0, Math.PI, MAX_CANNON_RANGE_ARC, 40));
+    stbdArcLine = new THREE.Line(stbdGeo, new THREE.LineBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.08 }));
+    rangeGroup.add(stbdArcLine);
+    const bowGeo = new THREE.BufferGeometry().setFromPoints(createArcPts(-Math.PI/6, Math.PI/6, MAX_CANNON_RANGE_ARC, 12));
+    bowArcLine = new THREE.Line(bowGeo, new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.08 }));
+    rangeGroup.add(bowArcLine);
+    rangeGroup.visible = false;
+    scene.add(rangeGroup);
+}
+
+function updateRangeArcs() {
+    if (!rangeGroup || !gameState || !myShipId) return;
+    const me = gameState.ships.find(s => s.id === myShipId);
+    if (!me || me.isSinking || me.isDead) { rangeGroup.visible = false; return; }
+    rangeGroup.visible = showRangeDisplay;
+    if (!showRangeDisplay) return;
+    rangeGroup.position.set(me.x, 0, me.z);
+    rangeGroup.rotation.y = me.ry;
+    const invQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), me.ry).invert();
+    let portHit = false, stbdHit = false, bowHit = false;
+    (gameState.ships || []).forEach(s => {
+        if (s.team === me.team || s.isSinking || s.isDead) return;
+        const dx = s.x - me.x, dz = s.z - me.z;
+        const dist = Math.sqrt(dx*dx + dz*dz);
+        if (dist > MAX_CANNON_RANGE_ARC) return;
+        const local = new THREE.Vector3(dx, 0, dz).applyQuaternion(invQ);
+        if (local.z < -2) portHit = true;
+        if (local.z >  2) stbdHit = true;
+        const fa = local.x > 0 ? Math.atan2(Math.abs(local.z), local.x) : Math.PI;
+        if (local.x > 0 && fa < Math.PI/6) bowHit = true;
+    });
+    portArcLine.material.color.setHex(portHit ? 0xff3300 : 0xff8800);
+    portArcLine.material.opacity = portHit ? 0.45 : 0.08;
+    stbdArcLine.material.color.setHex(stbdHit ? 0x00ffff : 0x0088cc);
+    stbdArcLine.material.opacity = stbdHit ? 0.45 : 0.08;
+    bowArcLine.material.color.setHex(bowHit  ? 0xffff00 : 0x886600);
+    bowArcLine.material.opacity  = bowHit  ? 0.45 : 0.08;
+}
 
 // ── Socket ─────────────────────────────────────────────────────────
 const socket = io(window.TRAFALGAR_SERVER, { transports: ['websocket'] });
@@ -188,6 +251,7 @@ socket.on('joined', ({ shipId }) => {
     myShipId = shipId;
     initCannons();
     initAimDivs();
+    initRangeArcs();
 });
 
 socket.on('state', (state) => {
@@ -396,7 +460,7 @@ function initAimDivs() {
 }
 
 function updateAimAssist(state) {
-    if (!gameState || !myShipId) { aimDivs.forEach(a => a.div.style.display = 'none'); return; }
+    if (!gameState || !myShipId || !showRangeDisplay) { aimDivs.forEach(a => a.div.style.display = 'none'); return; }
     const me = state.ships.find(s => s.id === myShipId);
     if (!me || me.isSinking || me.isDead) { aimDivs.forEach(a => a.div.style.display = 'none'); return; }
 
@@ -461,6 +525,9 @@ window.addEventListener('keydown', e => {
     }
     if (e.key === 'Tab') {
         e.preventDefault();
+        showRangeDisplay = !showRangeDisplay;
+    }
+    if (e.key.toLowerCase() === 'm') {
         showScoreboard = !showScoreboard;
         document.getElementById('scoreboard').style.display = showScoreboard ? 'block' : 'none';
     }
@@ -516,6 +583,7 @@ function animate() {
 
     updateParticles(dt);
     updateCannonCircles();
+    updateRangeArcs();
     fireLights.forEach(fl => { if (fl.intensity > 0) fl.intensity *= 0.88; });
 
     if (!gameState) { renderer.render(scene, camera); return; }
