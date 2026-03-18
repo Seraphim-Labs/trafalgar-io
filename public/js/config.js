@@ -1,2 +1,4 @@
-// Backend is hosted on fly.io — no changes needed.
-window.TRAFALGAR_SERVER = 'https://trafalgar-io.fly.dev';
+// Auto-detects backend.
+// On Render: uses same origin (server serves frontend too).
+// Locally: uses localhost:3001.
+window.TRAFALGAR_SERVER = window.location.origin;

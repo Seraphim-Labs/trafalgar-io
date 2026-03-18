@@ -2,30 +2,20 @@
 
 Multiplayer naval battle IO game. 3 game modes, 3 ship types, chat, clans, AI bots.
 
-**Frontend:** Netlify — https://chic-mousse-f1bb43.netlify.app
-**Backend:** Fly.io — https://trafalgar-io.fly.dev
+**Frontend (Netlify):** https://chic-mousse-f1bb43.netlify.app
+**Backend (Render):** deploy from GitHub below — no credit card needed
 
 ---
 
-## Deploy the Backend (the only step you need to do)
+## Deploy the Backend (only step needed — no credit card)
 
-Install the Fly CLI once:
-```
-powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
-```
+1. Go to **render.com** → sign up free (no credit card)
+2. New → **Web Service** → connect GitHub → select **trafalgar-io**
+3. Settings auto-fill from `render.yaml` → click **Deploy**
+4. Done — your game URL is `https://trafalgar-io.onrender.com`
 
-Then from the `trafalgar-io` folder:
-```
-flyctl auth login
-flyctl deploy
-```
-
-That's it. The game is live. No config to edit — everything points to `trafalgar-io.fly.dev` automatically.
-
-**Why Fly.io?**
-- No cold starts (always running)
-- Free tier: 3 VMs, 160 GB bandwidth/month
-- Much faster than Render free
+**No cold starts:** The server pings itself every 10 minutes automatically.
+It will never sleep, even on the free tier.
 
 ---
 
@@ -36,8 +26,6 @@ npm install
 node server.js
 # open http://localhost:3001
 ```
-
-For local dev, set `window.TRAFALGAR_SERVER = 'http://localhost:3001'` in `public/js/config.js`.
 
 ---
 
@@ -57,5 +45,5 @@ For local dev, set `window.TRAFALGAR_SERVER = 'http://localhost:3001'` in `publi
 
 ## Getting Players
 - Share on Discord browser-game servers
-- Post on r/WebGames with a clip
+- Post on r/WebGames
 - Add to itch.io as a free HTML game

@@ -120,4 +120,17 @@ app.get('/api/rooms', (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`trafalgar.io server running on :${PORT}`));
+server.listen(PORT, () => {
+    console.log(`trafalgar.io server running on :${PORT}`);
+
+    // Self-ping every 10 min to prevent Render free tier from sleeping.
+    // RENDER_EXTERNAL_URL is set automatically by Render.
+    if (process.env.RENDER_EXTERNAL_URL) {
+        const https = require('https');
+        setInterval(() => {
+            https.get(process.env.RENDER_EXTERNAL_URL + '/api/rooms', () => {})
+                 .on('error', () => {});
+        }, 10 * 60 * 1000);
+        console.log('Self-ping enabled — server will stay awake on Render free tier.');
+    }
+});
